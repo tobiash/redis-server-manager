@@ -1,0 +1,10 @@
+{
+  "redis": {
+    "servers": {
+      "cache": {
+        "address": "./.tmp/cache.sock",
+        "args": [ "./test/fixtures/cache.config" ]
+      }
+    }
+  }
+}
