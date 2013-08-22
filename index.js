@@ -5,7 +5,6 @@ var fs = require('fs'),
   async = require('async'),
   debug = require('debug')('redis-server-manager'),
   stream = require('stream'),
-  nconf = require('nconf'),
   temp = require('temp');
 
 var rbin = 'redis-server',
@@ -14,7 +13,7 @@ var rbin = 'redis-server',
 
 
 // List of named redis servers
-var namedServers = {};
+var namedServers = {}, serverConfig = {};
 
 process.on('exit', function () {
   Object.keys(namedServers).forEach(function (key) {
@@ -81,7 +80,9 @@ var redis = module.exports = {
         server.emit('ready');
         server.ready = true;
         server.child.stdout.unpipe(rstream);
-        cb(null, server);
+        if (typeof cb === 'function') {
+          cb(null, server);
+        }
       }
       done(null);
     };
@@ -216,6 +217,10 @@ var redis = module.exports = {
     return fn;
   },
 
+  setConfig: function (config) {
+    serverConfig = config;
+  },
+
   // Get a pre-configured redis-server by name
   byName: function (name, cb) {
     var server;
@@ -229,7 +234,7 @@ var redis = module.exports = {
       }
     }
     // Try to start up the server from configuration
-    var conf = nconf.get('redis:servers')[name];
+    var conf = serverConfig[name];
     if (!conf) {
       return cb(new Error('Named redis server "' + name + '" not found!'));
     }
