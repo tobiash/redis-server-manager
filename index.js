@@ -15,45 +15,13 @@ var rbin = 'redis-server',
 // List of named redis servers
 var namedServers = {}, serverConfig = {};
 
-process.on('exit', function () {
-  Object.keys(namedServers).forEach(function (key) {
-    debug('Shutting down managed Redis "%s"', key);
-    namedServers[key].stop();
-  });
-});
 
 var redis = module.exports = {
 
   /*
    * Gathers some information about the redis installation
    */
-  getInfo: function (cb) {
-    var info = {},
-      re = /\s+(\S+)=(\S+)(?=\s)/g,
-      rs = spawn(rbin, ['-v']),
-      s = new stream.Writable(),
-      arr = [];
-    s._write = function (chunk, encoding, callback) {
-      arr.push(chunk);
-      callback();
-    };
-    s.on('finish', function () {
-      var str = arr.join('');
-      // find key=value pairs
-      var x;
-      while ((x = re.exec(str))) {
-        info[x[1]] = x[2];
-      }
-    });
-    rs.stdout.pipe(s);
-    rs.on('close', function (code) {
-      if (code !== 0) {
-        cb(new Error('Could not execute redis binary'), null);
-      } else {
-        cb(null, info);
-      }
-    });
-  },
+  getInfo: require('./lib/getinfo')(rbin),
 
   /*
    * Starts up a redis server with the given command-line `args`.
@@ -77,8 +45,8 @@ var redis = module.exports = {
         server.emit('error', new Error(str));
       } else if (str.indexOf('The server is now ready to accept connections') >= 0) {
         debug('%s is ready', addr);
-        server.emit('ready');
         server.ready = true;
+        server.emit('ready');
         server.child.stdout.unpipe(rstream);
         if (typeof cb === 'function') {
           cb(null, server);
@@ -93,8 +61,8 @@ var redis = module.exports = {
     });
     server.child.on('exit', function (r) {
       debug('Child exit %d', r);
-      if (!server.stopped || r !== 0)  {
-        server.emit('error', new Error('Child process exited unexpectedly', r));
+      if (!server.stopped || r > 0)  {
+        server.emit('error', new Error('Child process exited unexpectedly with code ' + r));
       }
     });
     return server;
@@ -226,33 +194,49 @@ var redis = module.exports = {
     var server;
     if (!!(server = namedServers[name])) {
       if (server.ready) {
-        return cb(null, server);
+        cb(null, server);
       } else {
         server.once('ready', function () {
           cb(null, server);
         });
       }
+      return server;
     }
+
     // Try to start up the server from configuration
     var conf = serverConfig[name];
     if (!conf) {
       return cb(new Error('Named redis server "' + name + '" not found!'));
     }
+
     if (conf.config && conf.address) {
       debug('Spinning up Redis instance %s', name);
-      namedServers[name] = redis.startServerFromConfig(conf.address, conf.config, cb);
-      namedServers[name].once('stop', function () {
-        delete namedServers[name];
-      });
+      namedServers[name] = server = redis.startServerFromConfig(conf.address, conf.config, cb);
     } else if (conf.args && conf.address) {
       debug('Spinning up Redis instance %s', name);
-      namedServers[name] = redis.startServer(conf.address, conf.args, cb);
-      namedServers[name].once('stop', function () {
+      namedServers[name] = server = redis.startServer(conf.address, conf.args, cb);
+      server.once('stop', function () {
         delete namedServers[name];
       });
     } else {
       return cb(new Error('Invalid configuration for redis server "' + name + '"'));
     }
+    server.once('stop', function () {
+      delete namedServers[name];
+    });
+    return server;
+  },
+
+  shutdownAll: function () {
+    Object.keys(namedServers).forEach(function (key) {
+      debug('Shutting down managed Redis "%s"', key);
+      namedServers[key].stop();
+    });
+    namedServers = {};
   }
 
 };
+
+process.on('exit', function () {
+  redis.shutdownAll();
+});

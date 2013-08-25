@@ -14,22 +14,77 @@ describe('Redis Server', function () {
     });
   });
 
+  afterEach(rs.shutdownAll.bind(rs));
+
   describe('#byName()', function () {
 
-    it('should provide pre-configured cache server', function (done) {
+    before(function () {
       nconf.file(path.resolve(__dirname, 'fixtures/config.json'));
+      rs.setConfig(nconf.get('redis:servers'));
+    });
+
+    it('should provide pre-configured cache server', function (done) {
       rs.byName('cache', function (err, s) {
+        expect(err).not.to.be.defined;
         expect(s).to.be.defined;
         expect(s.ready).to.be.true;
         done(err);
       });
     });
 
+    it('should return a server instance before it\'s ready', function () {
+      var server = rs.byName('cache', function () {});
+      expect(server).to.be.defined;
+      expect(server.ready).to.be.false;
+    });
+
+
     // TODO Test correct server shutdown
 
   });
 
   describe('Server instances', function () {
+
+    describe('pre-ready', function () {
+
+      var server, pool;
+
+      describe('#createClient', function () {
+
+        it('should return null and call a callback', function (done) {
+          server = rs.createTestServer(function () {});
+          var client = server.createClient(function cb(err, client) {
+            expect(err).to.not.exist;
+            expect(client).to.exist;
+            expect(server.ready).to.equal(true);
+            done();
+          });
+          expect(client).to.not.exist;
+        });
+
+        it('should throw error if not ready and no callback', function () {
+          server = rs.createTestServer(function () {});
+          (function () {
+            server.createClient();
+          }).should.throw();
+        });
+
+      });
+
+      it('pools should delay clients until server is ready', function (done) {
+        server = rs.createTestServer(function () {});
+        expect(server).to.exist.and.have.property('ready', false);
+        pool = server.createPool();
+        expect(pool).to.exist;
+
+        pool.shared(function (err, client) {
+          expect(server.ready).to.equal(true);
+          expect(client).to.exist;
+          done();
+        });
+      });
+
+    });
 
   });
 
