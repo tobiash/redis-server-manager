@@ -1,0 +1,159 @@
+<!DOCTYPE html><html lang="en"><head><title>index</title></head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0"><meta name="groc-relative-root" content=""><meta name="groc-document-path" content="index"><meta name="groc-project-path" content="index.js"><link rel="stylesheet" type="text/css" media="all" href="assets/style.css"><script type="text/javascript" src="assets/behavior.js"></script><body><div id="meta"><div class="file-path">index.js</div></div><div id="document"><div class="segment"><div class="code"><div class="wrapper"><span class="kd">var</span> <span class="nx">fs</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;fs&#39;</span><span class="p">),</span>
+  <span class="nx">events</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;events&#39;</span><span class="p">),</span>
+  <span class="nx">util</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;util&#39;</span><span class="p">),</span>
+  <span class="nx">spawn</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;child_process&#39;</span><span class="p">).</span><span class="nx">spawn</span><span class="p">,</span>
+  <span class="nx">async</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;async&#39;</span><span class="p">),</span>
+  <span class="nx">debug</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;debug&#39;</span><span class="p">)(</span><span class="s1">&#39;redis-server-manager&#39;</span><span class="p">),</span>
+  <span class="nx">stream</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;stream&#39;</span><span class="p">),</span>
+  <span class="nx">temp</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;temp&#39;</span><span class="p">);</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><h1 id="redis-server-manager">Redis Server Manager</h1>
+
+<p>This is the main entry for redis-server-manager.</p></div></div><div class="code"><div class="wrapper"><span class="kd">var</span> <span class="nx">rbin</span> <span class="o">=</span> <span class="s1">&#39;redis-server&#39;</span><span class="p">,</span>
+  <span class="nx">RedisServer</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;./lib/redis-server&#39;</span><span class="p">),</span>
+  <span class="nx">StoppableRedisServer</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;./lib/stoppable-redis-server&#39;</span><span class="p">);</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>List of named redis servers</p></div></div><div class="code"><div class="wrapper"><span class="kd">var</span> <span class="nx">namedServers</span> <span class="o">=</span> <span class="p">{},</span> <span class="nx">serverConfig</span> <span class="o">=</span> <span class="p">{};</span>
+
+
+<span class="kd">var</span> <span class="nx">redis</span> <span class="o">=</span> <span class="nx">module</span><span class="p">.</span><span class="nx">exports</span> <span class="o">=</span> <span class="p">{</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Gathers some information about the redis installation</p></div></div><div class="code"><div class="wrapper">  <span class="nx">getInfo</span><span class="o">:</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;./lib/getinfo&#39;</span><span class="p">)(</span><span class="nx">rbin</span><span class="p">),</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Starts up a redis server with the given command-line <code>args</code>.
+<code>cb</code> is called whith the server object when the server is ready
+to accept connections. Alternatively, the function returns the
+server object and you may listen for a 'ready' event.</p></div></div><div class="code"><div class="wrapper">  <span class="nx">startServer</span><span class="o">:</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;./lib/start&#39;</span><span class="p">)(</span><span class="nx">rbin</span><span class="p">),</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Starts up a redis server with a given configuration (as string)</p></div></div><div class="code"><div class="wrapper">  <span class="nx">startServerFromConfig</span><span class="o">:</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">addr</span><span class="p">,</span> <span class="nx">config</span><span class="p">,</span> <span class="nx">cb</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">server</span> <span class="o">=</span> <span class="nx">redis</span><span class="p">.</span><span class="nx">startServer</span><span class="p">(</span><span class="nx">addr</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;-&#39;</span><span class="p">],</span> <span class="nx">cb</span><span class="p">);</span>
+    <span class="nx">server</span><span class="p">.</span><span class="nx">child</span><span class="p">.</span><span class="nx">stdin</span><span class="p">.</span><span class="nx">write</span><span class="p">(</span><span class="nx">config</span><span class="p">);</span>
+    <span class="nx">server</span><span class="p">.</span><span class="nx">child</span><span class="p">.</span><span class="nx">stdin</span><span class="p">.</span><span class="nx">end</span><span class="p">();</span>
+    <span class="k">return</span> <span class="nx">server</span><span class="p">;</span>
+  <span class="p">},</span>
+
+  <span class="nx">createServer</span><span class="o">:</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">addr</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="k">new</span> <span class="nx">RedisServer</span><span class="p">(</span><span class="nx">addr</span><span class="p">,</span> <span class="nx">opts</span><span class="p">);</span>
+  <span class="p">},</span>
+
+  <span class="nx">createTestServer</span><span class="o">:</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">cb</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">socket</span> <span class="o">=</span> <span class="nx">temp</span><span class="p">.</span><span class="nx">path</span><span class="p">({</span><span class="nx">suffix</span><span class="o">:</span> <span class="s1">&#39;.sock&#39;</span><span class="p">});</span>
+    <span class="kd">var</span> <span class="nx">config</span> <span class="o">=</span> <span class="s2">&quot;port 0\n&quot;</span> <span class="o">+</span>
+      <span class="s2">&quot;unixsocket &quot;</span> <span class="o">+</span> <span class="nx">socket</span> <span class="o">+</span> <span class="s2">&quot;\n&quot;</span> <span class="o">+</span>
+      <span class="s2">&quot;unixsocketperm 755&quot;</span><span class="p">;</span>
+    <span class="k">return</span> <span class="nx">redis</span><span class="p">.</span><span class="nx">startServerFromConfig</span><span class="p">(</span><span class="nx">socket</span><span class="p">,</span> <span class="nx">config</span><span class="p">,</span> <span class="nx">cb</span><span class="p">);</span>
+  <span class="p">},</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Helper to create clients from an options hash
+Options may contain one of
+- <code>createClient</code>
+  A synchronous function that creates a single client.
+- <code>server</code>
+  A redis server object or a string key of a named server
+- <code>clients</code>
+  Pre-configured clients object/array</p></div></div><div class="code"><div class="wrapper">  <span class="nx">createClients</span><span class="o">:</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">createFromServer</span><span class="p">,</span> <span class="nx">options</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="k">typeof</span> <span class="nx">createFromServer</span> <span class="o">===</span> <span class="s1">&#39;object&#39;</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">options</span> <span class="o">=</span> <span class="nx">createFromServer</span><span class="p">;</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Default to creating a single client</p></div></div><div class="code"><div class="wrapper">      <span class="nx">createFromServer</span> <span class="o">=</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">server</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="nx">server</span><span class="p">.</span><span class="nx">createClient</span><span class="p">();</span>
+      <span class="p">};</span>
+    <span class="p">}</span>
+
+    <span class="kd">var</span> <span class="nx">clients</span><span class="p">,</span> <span class="nx">clientsWait</span><span class="p">;</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Fall-through for pre-configured clients</p></div></div><div class="code"><div class="wrapper">    <span class="k">if</span> <span class="p">(</span><span class="nx">options</span><span class="p">.</span><span class="nx">clients</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">clients</span> <span class="o">=</span> <span class="nx">options</span><span class="p">.</span><span class="nx">clients</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="kd">function</span> <span class="nx">returnClients</span><span class="p">(</span><span class="nx">cb</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">process</span><span class="p">.</span><span class="nx">nextTick</span><span class="p">(</span><span class="kd">function</span> <span class="p">()</span> <span class="p">{</span>
+        <span class="nx">debug</span><span class="p">(</span><span class="s2">&quot;Clients %j&quot;</span><span class="p">,</span> <span class="nb">Object</span><span class="p">.</span><span class="nx">keys</span><span class="p">(</span><span class="nx">clients</span><span class="p">));</span>
+        <span class="nx">cb</span><span class="p">(</span><span class="kc">null</span><span class="p">,</span> <span class="nx">clients</span><span class="p">);</span>
+      <span class="p">});</span>
+    <span class="p">}</span>
+
+    <span class="kd">function</span> <span class="nx">doCreateFromServer</span><span class="p">(</span><span class="nx">server</span><span class="p">,</span> <span class="nx">cb</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">debug</span><span class="p">(</span><span class="s2">&quot;Creating from server&quot;</span><span class="p">);</span>
+      <span class="nx">clients</span> <span class="o">=</span> <span class="nx">createFromServer</span><span class="p">(</span><span class="nx">server</span><span class="p">);</span>
+      <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="nx">clients</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="nx">cb</span><span class="p">(</span><span class="k">new</span> <span class="nb">Error</span><span class="p">(</span><span class="s1">&#39;Could not create clients!&#39;</span><span class="p">));</span>
+      <span class="p">}</span>
+      <span class="nx">clientsWait</span><span class="p">.</span><span class="nx">emit</span><span class="p">(</span><span class="s1">&#39;ready&#39;</span><span class="p">);</span>
+      <span class="nx">returnClients</span><span class="p">(</span><span class="nx">cb</span><span class="p">);</span>
+    <span class="p">}</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Create clients from a server object or name</p></div></div><div class="code"><div class="wrapper">    <span class="kd">function</span> <span class="nx">fromServer</span><span class="p">(</span><span class="nx">server</span><span class="p">,</span> <span class="nx">cb</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">clientsWait</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">events</span><span class="p">.</span><span class="nx">EventEmitter</span><span class="p">();</span>
+      <span class="k">switch</span> <span class="p">(</span><span class="k">typeof</span> <span class="nx">server</span><span class="p">)</span> <span class="p">{</span>
+      <span class="k">case</span> <span class="s1">&#39;string&#39;</span><span class="o">:</span>
+        <span class="nx">redis</span><span class="p">.</span><span class="nx">byName</span><span class="p">(</span><span class="nx">server</span><span class="p">,</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">s</span><span class="p">)</span> <span class="p">{</span>
+          <span class="k">if</span> <span class="p">(</span><span class="nx">err</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="nx">cb</span><span class="p">(</span><span class="nx">err</span><span class="p">);</span>
+          <span class="p">}</span>
+          <span class="nx">doCreateFromServer</span><span class="p">(</span><span class="nx">s</span><span class="p">,</span> <span class="nx">cb</span><span class="p">);</span>
+        <span class="p">});</span>
+        <span class="k">break</span><span class="p">;</span>
+      <span class="k">case</span> <span class="s1">&#39;object&#39;</span><span class="o">:</span>
+        <span class="nx">process</span><span class="p">.</span><span class="nx">nextTick</span><span class="p">(</span><span class="nx">doCreateFromServer</span><span class="p">.</span><span class="nx">bind</span><span class="p">(</span><span class="kc">undefined</span><span class="p">,</span> <span class="nx">server</span><span class="p">,</span> <span class="nx">cb</span><span class="p">));</span>
+        <span class="k">break</span><span class="p">;</span>
+      <span class="k">default</span><span class="o">:</span>
+        <span class="nx">cb</span><span class="p">(</span><span class="k">new</span> <span class="nb">Error</span><span class="p">(</span><span class="s1">&#39;Invalid server option&#39;</span><span class="p">,</span> <span class="nx">server</span><span class="p">));</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="kd">function</span> <span class="nx">fn</span><span class="p">(</span><span class="nx">cb</span><span class="p">)</span> <span class="p">{</span>
+      <span class="k">if</span> <span class="p">(</span><span class="nx">clients</span><span class="p">)</span> <span class="p">{</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Return clients right away</p></div></div><div class="code"><div class="wrapper">        <span class="nx">returnClients</span><span class="p">(</span><span class="nx">cb</span><span class="p">);</span>
+      <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="nx">clientsWait</span><span class="p">)</span> <span class="p">{</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Wait for a client being constructed</p></div></div><div class="code"><div class="wrapper">        <span class="nx">clientsWait</span><span class="p">.</span><span class="nx">once</span><span class="p">(</span><span class="s1">&#39;ready&#39;</span><span class="p">,</span> <span class="nx">returnClients</span><span class="p">.</span><span class="nx">bind</span><span class="p">(</span><span class="kc">undefined</span><span class="p">,</span> <span class="nx">cb</span><span class="p">));</span>
+      <span class="p">}</span> <span class="k">else</span> <span class="p">{</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Create a new client</p></div></div><div class="code"><div class="wrapper">        <span class="k">if</span> <span class="p">(</span><span class="nx">options</span><span class="p">.</span><span class="nx">createClient</span><span class="p">)</span> <span class="p">{</span>
+          <span class="nx">clients</span> <span class="o">=</span> <span class="nx">options</span><span class="p">.</span><span class="nx">createClient</span><span class="p">();</span>
+          <span class="nx">returnClients</span><span class="p">(</span><span class="nx">cb</span><span class="p">);</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="nx">options</span><span class="p">.</span><span class="nx">server</span><span class="p">)</span> <span class="p">{</span>
+          <span class="nx">fromServer</span><span class="p">(</span><span class="nx">options</span><span class="p">.</span><span class="nx">server</span><span class="p">,</span> <span class="nx">cb</span><span class="p">);</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+          <span class="nx">cb</span><span class="p">(</span><span class="k">new</span> <span class="nb">Error</span><span class="p">(</span><span class="s1">&#39;Invalid options hash, could not create Redis client!&#39;</span><span class="p">));</span>
+        <span class="p">}</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="nx">fn</span><span class="p">.</span><span class="nx">reset</span> <span class="o">=</span> <span class="kd">function</span> <span class="p">()</span> <span class="p">{</span>
+      <span class="k">if</span> <span class="p">(</span><span class="nx">clients</span> <span class="o">&amp;&amp;</span> <span class="nx">clients</span><span class="p">.</span><span class="nx">quit</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">clients</span><span class="p">.</span><span class="nx">quit</span><span class="p">();</span>
+      <span class="p">}</span>
+      <span class="nx">clientsWait</span> <span class="o">=</span> <span class="nx">clients</span> <span class="o">=</span> <span class="kc">undefined</span><span class="p">;</span>
+    <span class="p">};</span>
+    
+    <span class="k">return</span> <span class="nx">fn</span><span class="p">;</span>
+  <span class="p">},</span>
+
+  <span class="nx">setConfig</span><span class="o">:</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">config</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">serverConfig</span> <span class="o">=</span> <span class="nx">config</span><span class="p">;</span>
+  <span class="p">},</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Get a pre-configured redis-server by name</p></div></div><div class="code"><div class="wrapper">  <span class="nx">byName</span><span class="o">:</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">name</span><span class="p">,</span> <span class="nx">cb</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">server</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!!</span><span class="p">(</span><span class="nx">server</span> <span class="o">=</span> <span class="nx">namedServers</span><span class="p">[</span><span class="nx">name</span><span class="p">]))</span> <span class="p">{</span>
+      <span class="k">if</span> <span class="p">(</span><span class="nx">server</span><span class="p">.</span><span class="nx">ready</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">cb</span><span class="p">(</span><span class="kc">null</span><span class="p">,</span> <span class="nx">server</span><span class="p">);</span>
+      <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="nx">server</span><span class="p">.</span><span class="nx">once</span><span class="p">(</span><span class="s1">&#39;ready&#39;</span><span class="p">,</span> <span class="kd">function</span> <span class="p">()</span> <span class="p">{</span>
+          <span class="nx">cb</span><span class="p">(</span><span class="kc">null</span><span class="p">,</span> <span class="nx">server</span><span class="p">);</span>
+        <span class="p">});</span>
+      <span class="p">}</span>
+      <span class="k">return</span> <span class="nx">server</span><span class="p">;</span>
+    <span class="p">}</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Try to start up the server from configuration</p></div></div><div class="code"><div class="wrapper">    <span class="kd">var</span> <span class="nx">conf</span> <span class="o">=</span> <span class="nx">serverConfig</span><span class="p">[</span><span class="nx">name</span><span class="p">];</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="nx">conf</span><span class="p">)</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="nx">cb</span><span class="p">(</span><span class="k">new</span> <span class="nb">Error</span><span class="p">(</span><span class="s1">&#39;Named redis server &quot;&#39;</span> <span class="o">+</span> <span class="nx">name</span> <span class="o">+</span> <span class="s1">&#39;&quot; not found!&#39;</span><span class="p">));</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="nx">conf</span><span class="p">.</span><span class="nx">config</span> <span class="o">&amp;&amp;</span> <span class="nx">conf</span><span class="p">.</span><span class="nx">address</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">debug</span><span class="p">(</span><span class="s1">&#39;Spinning up Redis instance %s&#39;</span><span class="p">,</span> <span class="nx">name</span><span class="p">);</span>
+      <span class="nx">namedServers</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span> <span class="o">=</span> <span class="nx">server</span> <span class="o">=</span> <span class="nx">redis</span><span class="p">.</span><span class="nx">startServerFromConfig</span><span class="p">(</span><span class="nx">conf</span><span class="p">.</span><span class="nx">address</span><span class="p">,</span> <span class="nx">conf</span><span class="p">.</span><span class="nx">config</span><span class="p">,</span> <span class="nx">cb</span><span class="p">);</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="nx">conf</span><span class="p">.</span><span class="nx">args</span> <span class="o">&amp;&amp;</span> <span class="nx">conf</span><span class="p">.</span><span class="nx">address</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">debug</span><span class="p">(</span><span class="s1">&#39;Spinning up Redis instance %s&#39;</span><span class="p">,</span> <span class="nx">name</span><span class="p">);</span>
+      <span class="nx">namedServers</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span> <span class="o">=</span> <span class="nx">server</span> <span class="o">=</span> <span class="nx">redis</span><span class="p">.</span><span class="nx">startServer</span><span class="p">(</span><span class="nx">conf</span><span class="p">.</span><span class="nx">address</span><span class="p">,</span> <span class="nx">conf</span><span class="p">.</span><span class="nx">args</span><span class="p">,</span> <span class="nx">cb</span><span class="p">);</span>
+      <span class="nx">server</span><span class="p">.</span><span class="nx">once</span><span class="p">(</span><span class="s1">&#39;stop&#39;</span><span class="p">,</span> <span class="kd">function</span> <span class="p">()</span> <span class="p">{</span>
+        <span class="k">delete</span> <span class="nx">namedServers</span><span class="p">[</span><span class="nx">name</span><span class="p">];</span>
+      <span class="p">});</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="nx">cb</span><span class="p">(</span><span class="k">new</span> <span class="nb">Error</span><span class="p">(</span><span class="s1">&#39;Invalid configuration for redis server &quot;&#39;</span> <span class="o">+</span> <span class="nx">name</span> <span class="o">+</span> <span class="s1">&#39;&quot;&#39;</span><span class="p">));</span>
+    <span class="p">}</span>
+    <span class="nx">server</span><span class="p">.</span><span class="nx">once</span><span class="p">(</span><span class="s1">&#39;stop&#39;</span><span class="p">,</span> <span class="kd">function</span> <span class="p">()</span> <span class="p">{</span>
+      <span class="k">delete</span> <span class="nx">namedServers</span><span class="p">[</span><span class="nx">name</span><span class="p">];</span>
+    <span class="p">});</span>
+    <span class="k">return</span> <span class="nx">server</span><span class="p">;</span>
+  <span class="p">},</span>
+
+  <span class="nx">shutdownAll</span><span class="o">:</span> <span class="kd">function</span> <span class="p">()</span> <span class="p">{</span>
+    <span class="nb">Object</span><span class="p">.</span><span class="nx">keys</span><span class="p">(</span><span class="nx">namedServers</span><span class="p">).</span><span class="nx">forEach</span><span class="p">(</span><span class="kd">function</span> <span class="p">(</span><span class="nx">key</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">debug</span><span class="p">(</span><span class="s1">&#39;Shutting down managed Redis &quot;%s&quot;&#39;</span><span class="p">,</span> <span class="nx">key</span><span class="p">);</span>
+      <span class="nx">namedServers</span><span class="p">[</span><span class="nx">key</span><span class="p">].</span><span class="nx">stop</span><span class="p">();</span>
+    <span class="p">});</span>
+    <span class="nx">namedServers</span> <span class="o">=</span> <span class="p">{};</span>
+  <span class="p">}</span>
+
+<span class="p">};</span>
+
+<span class="nx">process</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s1">&#39;exit&#39;</span><span class="p">,</span> <span class="kd">function</span> <span class="p">()</span> <span class="p">{</span>
+  <span class="nx">redis</span><span class="p">.</span><span class="nx">shutdownAll</span><span class="p">();</span>
+<span class="p">});</span></div></div></div></div></body></html>

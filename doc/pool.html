@@ -1,0 +1,68 @@
+<!DOCTYPE html><html lang="en"><head><title>pool</title></head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0"><meta name="groc-relative-root" content=""><meta name="groc-document-path" content="pool"><meta name="groc-project-path" content="lib/pool.js"><link rel="stylesheet" type="text/css" media="all" href="assets/style.css"><script type="text/javascript" src="assets/behavior.js"></script><body><div id="meta"><div class="file-path">lib/pool.js</div></div><div id="document"><div class="segment"><div class="code"><div class="wrapper"><span class="kd">var</span> <span class="nx">events</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;events&#39;</span><span class="p">),</span>
+  <span class="nx">util</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;util&#39;</span><span class="p">),</span>
+  <span class="nx">genPool</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;generic-pool&#39;</span><span class="p">);</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><h1 id="redis-connection-pool">Redis connection pool</h1>
+
+<p>Pools node_redis client connections to a Redis server.
+Provides a shared client that can be used for most tasks,
+and creates and pools exclusive clients. These clients
+might be used for subscriptions or the WATCH command that
+might collide with other operations.</p></div></div><div class="code"><div class="wrapper"><span class="kd">function</span> <span class="nx">Pool</span><span class="p">(</span><span class="nx">server</span><span class="p">,</span> <span class="nx">opts</span><span class="p">)</span> <span class="p">{</span>
+  <span class="nx">events</span><span class="p">.</span><span class="nx">EventEmitter</span><span class="p">.</span><span class="nx">call</span><span class="p">(</span><span class="k">this</span><span class="p">);</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">ready</span> <span class="o">=</span> <span class="nx">server</span><span class="p">.</span><span class="nx">ready</span><span class="p">;</span>
+
+  <span class="kd">var</span> <span class="nx">pool</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">_pool</span> <span class="o">=</span> <span class="nx">genPool</span><span class="p">.</span><span class="nx">Pool</span><span class="p">({</span>
+    <span class="nx">create</span><span class="o">:</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">callback</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">server</span><span class="p">.</span><span class="nx">createClient</span><span class="p">(</span><span class="kd">function</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">client</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">client</span><span class="p">.</span><span class="nx">release</span> <span class="o">=</span> <span class="kd">function</span> <span class="p">()</span> <span class="p">{</span>
+          <span class="nx">pool</span><span class="p">.</span><span class="nx">release</span><span class="p">(</span><span class="nx">client</span><span class="p">);</span>
+        <span class="p">};</span>
+        <span class="nx">callback</span><span class="p">(</span><span class="kc">null</span><span class="p">,</span> <span class="nx">client</span><span class="p">);</span>
+      <span class="p">});</span>
+    <span class="p">},</span>
+    <span class="nx">destroy</span><span class="o">:</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">client</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">client</span><span class="p">.</span><span class="nx">quit</span><span class="p">();</span>
+    <span class="p">}</span>
+  <span class="p">});</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">opts</span> <span class="o">=</span> <span class="nx">opts</span> <span class="o">||</span> <span class="p">{};</span>
+
+  <span class="k">if</span> <span class="p">(</span><span class="nx">server</span><span class="p">.</span><span class="nx">ready</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">_onServerReady</span><span class="p">(</span><span class="nx">server</span><span class="p">);</span>
+  <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+    <span class="nx">server</span><span class="p">.</span><span class="nx">once</span><span class="p">(</span><span class="s1">&#39;ready&#39;</span><span class="p">,</span> <span class="k">this</span><span class="p">.</span><span class="nx">_onServerReady</span><span class="p">.</span><span class="nx">bind</span><span class="p">(</span><span class="k">this</span><span class="p">,</span> <span class="nx">server</span><span class="p">));</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="nx">util</span><span class="p">.</span><span class="nx">inherits</span><span class="p">(</span><span class="nx">Pool</span><span class="p">,</span> <span class="nx">events</span><span class="p">.</span><span class="nx">EventEmitter</span><span class="p">);</span>
+
+<span class="nx">Pool</span><span class="p">.</span><span class="nx">prototype</span><span class="p">.</span><span class="nx">_onServerReady</span> <span class="o">=</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">server</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_sharedConn</span> <span class="o">=</span> <span class="nx">server</span><span class="p">.</span><span class="nx">createClient</span><span class="p">();</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Disable watch for the shared connection</p></div></div><div class="code"><div class="wrapper">  <span class="k">this</span><span class="p">.</span><span class="nx">_sharedConn</span><span class="p">.</span><span class="nx">watch</span> <span class="o">=</span> <span class="kc">null</span><span class="p">;</span>
+
+  <span class="k">this</span><span class="p">.</span><span class="nx">ready</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">emit</span><span class="p">(</span><span class="s1">&#39;ready&#39;</span><span class="p">);</span>
+<span class="p">};</span>
+
+<span class="nx">Pool</span><span class="p">.</span><span class="nx">prototype</span><span class="p">.</span><span class="nx">whenReady</span> <span class="o">=</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">fn</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">if</span> <span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">ready</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">process</span><span class="p">.</span><span class="nx">nextTick</span><span class="p">(</span><span class="nx">fn</span><span class="p">.</span><span class="nx">bind</span><span class="p">(</span><span class="k">this</span><span class="p">,</span> <span class="k">this</span><span class="p">));</span>
+  <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">once</span><span class="p">(</span><span class="s1">&#39;ready&#39;</span><span class="p">,</span> <span class="nx">fn</span><span class="p">.</span><span class="nx">bind</span><span class="p">(</span><span class="k">this</span><span class="p">,</span> <span class="k">this</span><span class="p">));</span>
+  <span class="p">}</span>
+<span class="p">};</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Acquire the shared connection. This is to be used for operations
+that don't require optimistic locking via <code>watch</code>.</p></div></div><div class="code"><div class="wrapper"><span class="nx">Pool</span><span class="p">.</span><span class="nx">prototype</span><span class="p">.</span><span class="nx">shared</span> <span class="o">=</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">cb</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">whenReady</span><span class="p">(</span><span class="kd">function</span> <span class="p">(</span><span class="nx">pool</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">cb</span><span class="p">(</span><span class="kc">null</span><span class="p">,</span> <span class="nx">pool</span><span class="p">.</span><span class="nx">_sharedConn</span><span class="p">);</span>
+  <span class="p">});</span>
+<span class="p">};</span></div></div></div><div class="segment"><div class="comments "><div class="wrapper"><p>Acquire an exclusive connection</p></div></div><div class="code"><div class="wrapper"><span class="nx">Pool</span><span class="p">.</span><span class="nx">prototype</span><span class="p">.</span><span class="nx">exclusive</span> <span class="o">=</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">cb</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_pool</span><span class="p">.</span><span class="nx">acquire</span><span class="p">(</span><span class="nx">cb</span><span class="p">);</span>
+<span class="p">};</span>
+
+
+<span class="nx">Pool</span><span class="p">.</span><span class="nx">prototype</span><span class="p">.</span><span class="nx">quit</span> <span class="o">=</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">cb</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kd">var</span> <span class="nx">pool</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">_pool</span><span class="p">;</span>
+  <span class="nx">pool</span><span class="p">.</span><span class="nx">drain</span><span class="p">(</span><span class="kd">function</span> <span class="p">()</span> <span class="p">{</span>
+    <span class="nx">pool</span><span class="p">.</span><span class="nx">destroyAllNow</span><span class="p">(</span><span class="nx">cb</span><span class="p">);</span>
+  <span class="p">});</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_sharedConn</span><span class="p">.</span><span class="nx">quit</span><span class="p">();</span>
+<span class="p">};</span>
+
+<span class="nx">module</span><span class="p">.</span><span class="nx">exports</span> <span class="o">=</span> <span class="nx">Pool</span><span class="p">;</span></div></div></div></div></body></html>

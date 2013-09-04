@@ -7,6 +7,14 @@ var fs = require('fs'),
   stream = require('stream'),
   temp = require('temp');
 
+
+/**
+ * Redis Server Manager
+ * ====================
+ *
+ * This is the main entry for redis-server-manager.
+ *
+ */
 var rbin = 'redis-server',
   RedisServer = require('./lib/redis-server'),
   StoppableRedisServer = require('./lib/stoppable-redis-server');
@@ -29,44 +37,7 @@ var redis = module.exports = {
    * to accept connections. Alternatively, the function returns the
    * server object and you may listen for a 'ready' event.
    */
-  startServer: function (addr, args, cb) {
-    var server = new StoppableRedisServer(addr);
-    server.child = spawn(rbin, args);
-    server.ready = false;
-    // Parse console output
-    var rest = '',
-      rstream = new stream.Writable();
-    rstream._write = function (chunk, encoding, done) {
-      var str = rest + chunk.toString();
-      debug('%s stdout: %s', addr, str);
-      var lines = str.split('\n');
-      rest = lines.pop();
-      if (str.indexOf('error') >= 0 || str.indexOf('Error') >= 0) {
-        server.emit('error', new Error(str));
-      } else if (str.indexOf('The server is now ready to accept connections') >= 0) {
-        debug('%s is ready', addr);
-        server.ready = true;
-        server.emit('ready');
-        server.child.stdout.unpipe(rstream);
-        if (typeof cb === 'function') {
-          cb(null, server);
-        }
-      }
-      done(null);
-    };
-    server.child.stdout.pipe(rstream);
-    server.child.on('error', function (err) {
-      debug('Child error %j', err);
-      server.emit('error', new Error('Child process error', err));
-    });
-    server.child.on('exit', function (r) {
-      debug('Child exit %d', r);
-      if (!server.stopped || r > 0)  {
-        server.emit('error', new Error('Child process exited unexpectedly with code ' + r));
-      }
-    });
-    return server;
-  },
+  startServer: require('./lib/start')(rbin),
 
   /*
    * Starts up a redis server with a given configuration (as string)
